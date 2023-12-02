@@ -4,7 +4,7 @@ import os
 
 class Run:
     def __init__(self, config) -> None:
-        os.system("cls" if os.name == 'nt' else "clear")
+        self.config = config
         try:
             cookies = open(input("File with cookies to refresh: "), "r").read().split("\n")
             os.system("cls" if os.name == 'nt' else "clear")
@@ -13,7 +13,16 @@ class Run:
             print(e)
 
     async def start(self, cookies):
-        open("refreshed_cookies.txt", "w").write("\n".join(await asyncio.gather(*[self.get_set_cookie(cookie) for cookie in cookies])))
+        semaphore = asyncio.Semaphore(self.config["max_threads"]) 
+
+        async def process_cookie(cookie):
+            async with semaphore:
+                return await self.get_set_cookie(cookie)
+
+        refreshed_cookies = await asyncio.gather(*[process_cookie(cookie) for cookie in cookies])
+
+        open("refreshed_cookies.txt", "w+").write("\n".join(refreshed_cookies))
+
         return os.path.dirname(os.path.abspath("refreshed_cookies.txt"))
 
     async def get_set_cookie(self, cookie):
