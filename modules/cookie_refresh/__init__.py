@@ -15,18 +15,20 @@ class Run:
     async def start(self, cookies):
         semaphore = asyncio.Semaphore(self.config["max_threads"]) 
 
-        async def process_cookie(cookie):
+        async def process_cookie(cookie, session):
             async with semaphore:
-                return await self.get_set_cookie(cookie)
+                try:
+                    return await self.get_set_cookie(cookie, session)
+                except:
+                    return None
+        async with aiohttp.ClientSession() as session:
+            refreshed_cookies = await asyncio.gather(*[process_cookie(cookie, session) for cookie in cookies])
 
-        refreshed_cookies = await asyncio.gather(*[process_cookie(cookie) for cookie in cookies])
-
-        open("refreshed_cookies.txt", "w+").write("\n".join(refreshed_cookies))
+        open("refreshed_cookies.txt", "w+").write("\n".join([result for result in refreshed_cookies if result]))
 
         return os.path.dirname(os.path.abspath("refreshed_cookies.txt"))
 
-    async def get_set_cookie(self, cookie):
-        async with aiohttp.ClientSession() as session:
+    async def get_set_cookie(self, cookie, session):
             response = await session.post("https://auth.roblox.com/v1/authentication-ticket/redeem",
                                           headers={"rbxauthenticationnegotiation": "1"},
                                           json={"authenticationTicket": await self.get_rbx_authentication_ticket(cookie, session)})
